@@ -1,0 +1,55 @@
+-----------------------------------------------AddPrimaryContact--------------------------------------------
+public class AddPrimaryContact implements Queueable {
+    private Contact contact = new Contact();
+    private String state = '';
+    
+    // constructor
+    public AddPrimaryContact(Contact contact, String state){
+        this.contact = contact;
+        this.state = state;
+    }
+    
+    // execute method
+    public void execute(QueueableContext context){
+        List<Account> accounts = [SELECT id, name FROM Account WHERE BillingState=:state LIMIT 200];
+        List<Contact> contacts = new List<Contact>();
+        for (Account account: accounts){
+            Contact cloneContact = contact.clone();
+            cloneContact.AccountId=account.Id;
+            Contacts.add(cloneContact);
+        }
+        insert contacts;
+    }
+}
+
+
+--------------------------------------AddPrimaryContactTest-----------------------------------------
+@isTest
+public class AddPrimaryContactTest {
+	
+   	@isTest
+    static void test(){
+        // prepare test data
+        List<Account> accounts = new List<Account>();
+        for (Integer i = 0; i < 50; i++){
+            accounts.add(new Account(Name='Test Account ' + i, BillingState = 'CA'));
+        }
+        Contact contact = new Contact(FirstName = 'Test', LastName = 'Contact');
+        insert accounts;
+        insert contact;
+
+        // invoke the queable method
+        // instantiate a new instance of the Queueable class
+        Test.startTest();
+        AddPrimaryContact queueableJob = new AddPrimaryContact(contact, 'CA');
+        // enqueue the job for processing
+		ID jobID = System.enqueueJob(queueableJob);
+        Test.stopTest();
+        
+        // assert
+        List<Contact> filteredContacts = [SELECT id, Account.BillingAddress FROM Contact WHERE Account.BillingState = 'CA'];
+        System.assertEquals(50, filteredContacts.size());
+        
+    }
+    
+}
